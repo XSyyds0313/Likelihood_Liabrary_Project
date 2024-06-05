@@ -51,9 +51,9 @@ def main():
     parser.add_argument('--root_path', type=str, default=HEAD_PATH, help='root path of the data file') # default='./dataset/ETT/'
     parser.add_argument('--data_path', type=str, default=TMP_DATA_PATH, help='data file') # default='ETTh1.csv'
     parser.add_argument('--features', type=str, default='M',
-                        help='forecasting task, options: [M, S, MS]; '
+                        help='forecasting task, input and output of the model, options: [M, S, MS]; ' # default='M'不要修改
                              'M: multivariate predict multivariate, S: univariate predict univariate, MS: multivariate predict univariate')
-    parser.add_argument('--target', type=str, default='ret', help='target feature in S or MS task') # default='OT'
+    parser.add_argument('--target', type=str, default='ret', help='target feature in S or MS task') # todo
     parser.add_argument('--freq', type=str, default='t', # todo  default='h'
                         help='freq for time features encoding, options: [s:secondly, t:minutely, h:hourly, d:daily, b:business days, w:weekly, m:monthly], '
                              'you can also use more detailed freq like 15min or 3h')

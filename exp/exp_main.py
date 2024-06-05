@@ -127,7 +127,7 @@ class Exp_Main(Exp_Basic):
             for i, (batch_x, batch_y, batch_x_mark, batch_y_mark, label) in enumerate(train_loader):
                 # 取出的3维数据, 分别是batch_size, seq_len(x) or label_len+pre_len(y), features; mark代表时间编码数据
                 iter_count += 1 # 记录每100个中批次的序号
-                print("i, iter_count", i, iter_count)
+                print("i", i)
                 model_optim.zero_grad()
 
                 batch_x = batch_x.float().to(self.device)
@@ -148,7 +148,7 @@ class Exp_Main(Exp_Basic):
                         else:
                             outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
 
-                        f_dim = -1 if self.args.features == 'MS' else 0
+                        f_dim = -1 if self.args.features == 'MS' else 0 # todo
                         outputs = outputs[:, -self.args.pred_len:, f_dim:]
                         pred = self.task_object(outputs)
                         label = label.squeeze()
@@ -162,8 +162,8 @@ class Exp_Main(Exp_Basic):
 
                     f_dim = -1 if self.args.features == 'MS' else 0
                     outputs = outputs[:, -self.args.pred_len:, f_dim:]
-                    pred = self.task_object(outputs)
-                    label = label.squeeze()
+                    pred = self.task_object(outputs) # (B, L, 1) or (B, 1)    label is (B, L, 1) or (B, 1, 1)
+                    label = label.view(pred.shape)
                     loss = criterion(pred, label)
                     train_loss.append(loss.item())
 
@@ -229,9 +229,9 @@ class Exp_Main(Exp_Basic):
                     else:
                         outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
                 f_dim = -1 if self.args.features == 'MS' else 0
-                outputs = outputs[:, -self.args.pred_len:, f_dim:]
-                pred = self.task_object(outputs).detach().cpu()
-                label = label.squeeze().detach().cpu()
+                outputs = outputs[:, -self.args.pred_len:, f_dim:] #
+                pred = self.task_object(outputs).detach().cpu() # (B, L, 1) or (B, 1)    label is (B, L, 1) or (B, 1, 1)
+                label = label.view(pred.shape).detach().cpu()
                 loss = criterion(pred, label)
                 total_loss.append(loss)
 

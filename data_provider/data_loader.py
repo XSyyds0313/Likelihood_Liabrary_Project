@@ -127,7 +127,7 @@ class Dataset_task12(Dataset):
         r_begin = s_end - self.label_len
         r_end = r_begin + self.label_len + self.pred_len
         label_begin = r_begin + self.label_len
-        label_end = r_begin + self.label_len + 1
+        label_end = r_begin + self.label_len + self.pred_len
 
         seq_x = self.data_x[s_begin:s_end]
         seq_y = self.data_y[r_begin:r_end]
