@@ -31,16 +31,23 @@ def main():
 
     # basic config
     parser.add_argument('--is_training', type=int, default=1, help='status')
-    parser.add_argument('--task_id', type=str, default='test', help='task id')
     parser.add_argument('--model', type=str, default='iInformer',
                         help='model name, options: [Transformer, Informer, Autoformer, FEDformer, ns_Transformer, ns_Informer, ns_Autoformer, iTransformer, iInformer, Crossformer]')
     parser.add_argument('--product', type=str, default='cu', help='product')
+
+    # task
+    parser.add_argument('--task_id', type=str, default='test', help='task id')
     parser.add_argument('--train_vali_split', type=str, default='20220501', help='the start day of vali set')
     parser.add_argument('--vali_test_split', type=str, default='20220601', help='the start day of test set')
+    # task 1&2
+    parser.add_argument('--test_time_list', type=str, help='time list used for test in task3',
+                        default=['20220601 10:00.0','20220601 11:00.0','20220601 14:00.0','20220601 14:30.0','20220601 22:00.0','20220601 00:30.0'])
+    # task 3
     parser.add_argument('--num_class', type=str, default=3, help='classes of ret')
+    parser.add_argument('--test_day_list', type=str, default=['20220601', '20220602', '20220603'], help='day list used for test in task3')
 
     # data loader
-    parser.add_argument('--data', type=str, default='debug', help='dataset type') # default='ETTh1' 'task4'
+    parser.add_argument('--data', type=str, default='debug', help='dataset: [task1, task2, task3, task4]') # default='ETTh1' 'task4'
     parser.add_argument('--root_path', type=str, default=HEAD_PATH, help='root path of the data file') # default='./dataset/ETT/'
     parser.add_argument('--data_path', type=str, default=TMP_DATA_PATH, help='data file') # default='ETTh1.csv'
     parser.add_argument('--features', type=str, default='M',

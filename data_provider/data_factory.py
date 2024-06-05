@@ -1,13 +1,10 @@
-from data_provider.data_loader import Dataset_ETT_hour, Dataset_ETT_minute, Dataset_Custom, Dataset_Pred, Dataset_task4
+from data_provider.data_loader import Dataset_task12, Dataset_task3, Dataset_task4
 from torch.utils.data import DataLoader
 
 data_dict = {
-    'ETTh1': Dataset_ETT_hour,
-    'ETTh2': Dataset_ETT_hour,
-    'ETTm1': Dataset_ETT_minute,
-    'ETTm2': Dataset_ETT_minute,
-    'custom': Dataset_Custom,
-    'debug': Dataset_ETT_minute,
+    'task1': Dataset_task12,
+    'task2': Dataset_task12,
+    'task3': Dataset_task3,
     'task4': Dataset_task4,
 }
 
@@ -19,7 +16,7 @@ SAVE_PATH = "order book data"
 DATA_PATH_1 = HEAD_PATH + "/order book tick/"
 DATA_PATH_2 = HEAD_PATH + "/order flow tick/"
 TMP_DATA_PATH = HEAD_PATH + "/tmp pkl/"
-product_list = ["cu", "zn", "ni"]
+product_list = ["cu", "zn", "ni", "au", "ag"]
 product = "cu"
 train_vali_split = "20220501"
 vali_test_split = "20220601"
@@ -56,7 +53,9 @@ def data_provider_task(args, flag):
                     freq=freq,
                     product=args.product,
                     train_vali_split=args.train_vali_split,
-                    vali_test_split=args.vali_test_split)
+                    vali_test_split=args.vali_test_split,
+                    test_time_list=args.test_time_list,
+                    test_day_list=args.test_day_list)
     print(flag, len(data_set))
     data_loader = DataLoader(data_set,
                              batch_size=batch_size,
@@ -64,6 +63,9 @@ def data_provider_task(args, flag):
                              num_workers=args.num_workers, # 使用多个子进程来加载数据
                              drop_last=drop_last) # 数据集大小不能被batch_size整除时丢弃最后的batch
     return data_set, data_loader
+
+
+
 
 
 def data_provider(args, flag):
