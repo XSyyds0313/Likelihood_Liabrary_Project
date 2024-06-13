@@ -2,6 +2,12 @@ import numpy as np
 import torch
 import matplotlib.pyplot as plt
 
+import _pickle as cPickle
+import gzip
+import dask
+from dask import compute, delayed
+import functools
+
 plt.switch_backend('agg')
 
 
@@ -82,6 +88,8 @@ def visual(true, preds=None, name='./pic/test.pdf'):
     """
     Results visualization
     """
+    true = true.squeeze(0).squeeze(1)
+    preds = preds.squeeze(0).squeeze(1)
     plt.figure()
     plt.plot(true, label='GroundTruth', linewidth=2)
     if preds is not None:

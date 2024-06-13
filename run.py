@@ -15,11 +15,17 @@ SAVE_PATH = "order book data"
 # 样本的目录
 DATA_PATH_1 = HEAD_PATH + "/order book tick/"
 DATA_PATH_2 = HEAD_PATH + "/order flow tick/"
-TMP_DATA_PATH = HEAD_PATH + "/tmp pkl/"
+# TMP_DATA_PATH = HEAD_PATH + "/tmp pkl/"
+TMP_DATA_PATH = HEAD_PATH + "/tmp debug/"
 product_list = ["cu", "zn", "ni"]
 product = "cu"
 train_vali_split = "20220501"
 vali_test_split = "20220601"
+feature_list = ['BidPrice1', 'BidVolume1', 'AskPrice1', 'AskVolume1',
+                'BidPrice2', 'BidVolume2', 'AskPrice2', 'AskVolume2',
+                'BidPrice3', 'BidVolume3', 'AskPrice3', 'AskVolume3',
+                'BidPrice4', 'BidVolume4', 'AskPrice4', 'AskVolume4',
+                'BidPrice5', 'BidVolume5', 'AskPrice5', 'AskVolume5']
 
 def main():
     fix_seed = 2021
@@ -30,30 +36,27 @@ def main():
     parser = argparse.ArgumentParser(description='Transformer-based models for Time Series Forecasting')
 
     # basic config
-    parser.add_argument('--is_training', type=int, default=1, help='status')
-    parser.add_argument('--model', type=str, default='iInformer',
+    parser.add_argument('--CORE_NUM', type=int, default=int(os.environ['NUMBER_OF_PROCESSORS']), help='core of your computer')
+    parser.add_argument('--is_training', type=int, default=1, help='status') # todo
+    parser.add_argument('--model', type=str, default='Transformer',
                         help='model name, options: [Transformer, Informer, Autoformer, FEDformer, ns_Transformer, ns_Informer, ns_Autoformer, iTransformer, iInformer, Crossformer]')
     parser.add_argument('--product', type=str, default='cu', help='product')
 
     # task
     parser.add_argument('--task_id', type=str, default='test', help='task id')
-    parser.add_argument('--train_vali_split', type=str, default='20220501', help='the start day of vali set')
-    parser.add_argument('--vali_test_split', type=str, default='20220601', help='the start day of test set')
-    # task 1&2
-    parser.add_argument('--test_time_list', type=str, help='time list used for test in task3',
-                        default=['20220601 10:00.0','20220601 11:00.0','20220601 14:00.0','20220601 14:30.0','20220601 22:00.0','20220601 00:30.0'])
+    parser.add_argument('--train_vali_split', type=str, default='20220105', help='the start day of vali set')
+    parser.add_argument('--vali_test_split', type=str, default='20220106', help='the start day of test set')
+    parser.add_argument('--test_day_list', type=str, default=['20220601', '20220602'], help='day list used for test in task1 and task2 and task3')
+
     # task 3
     parser.add_argument('--num_class', type=str, default=3, help='classes of ret')
-    parser.add_argument('--test_day_list', type=str, default=['20220601', '20220602', '20220603'], help='day list used for test in task3')
 
     # data loader
-    parser.add_argument('--data', type=str, default='debug', help='dataset: [task1, task2, task3, task4]') # default='ETTh1' 'task4'
-    parser.add_argument('--root_path', type=str, default=HEAD_PATH, help='root path of the data file') # default='./dataset/ETT/'
-    parser.add_argument('--data_path', type=str, default=TMP_DATA_PATH, help='data file') # default='ETTh1.csv'
-    parser.add_argument('--features', type=str, default='M',
-                        help='forecasting task, input and output of the model, options: [M, S, MS]; ' # default='M'不要修改
-                             'M: multivariate predict multivariate, S: univariate predict univariate, MS: multivariate predict univariate')
-    parser.add_argument('--target', type=str, default='ret', help='target feature in S or MS task') # todo
+    parser.add_argument('--data', type=str, default='task2', help='dataset: [task1, task2, task3, task4]')
+    parser.add_argument('--root_path', type=str, default=HEAD_PATH, help='root path of the data file')
+    parser.add_argument('--data_path', type=str, default=TMP_DATA_PATH, help='data file')
+    parser.add_argument('--features', type=str, default=feature_list, help='features to predict target')
+    parser.add_argument('--target', type=str, default='ret', help='target feature') # todo
     parser.add_argument('--freq', type=str, default='t', # todo  default='h'
                         help='freq for time features encoding, options: [s:secondly, t:minutely, h:hourly, d:daily, b:business days, w:weekly, m:monthly], '
                              'you can also use more detailed freq like 15min or 3h')
@@ -66,9 +69,9 @@ def main():
     parser.add_argument('--pred_len', type=int, default=96, help='prediction sequence length')
 
     # model define
-    parser.add_argument('--enc_in', type=int, default=7, help='encoder input size') # 根据特征数量修改 # todo
-    parser.add_argument('--dec_in', type=int, default=7, help='decoder input size') # todo
-    parser.add_argument('--c_out', type=int, default=7, help='output size') # todo
+    parser.add_argument('--enc_in', type=int, default=20, help='encoder input size') # 根据特征数量修改 # todo
+    parser.add_argument('--dec_in', type=int, default=20, help='decoder input size') # todo
+    parser.add_argument('--c_out', type=int, default=20, help='output size') # todo
     parser.add_argument('--d_model', type=int, default=512, help='dimension of model')
     parser.add_argument('--n_heads', type=int, default=8, help='num of heads')
     parser.add_argument('--e_layers', type=int, default=2, help='num of encoder layers')
@@ -79,8 +82,8 @@ def main():
     parser.add_argument('--distil', action='store_false', default=True,
                         help='whether to use distilling in encoder, using this argument means not using distilling')
     parser.add_argument('--dropout', type=float, default=0.05, help='dropout')
-    parser.add_argument('--embed', type=str, default='timeF',
-                        help='time features encoding, options:[timeF, fixed, learned]')
+    parser.add_argument('--embed', type=str, default='fixed',
+                        help='time features encoding, options:[timeF, fixed, learned]') # todo
     parser.add_argument('--activation', type=str, default='gelu', help='activation')
     parser.add_argument('--output_attention', action='store_true', default=False, help='whether to output attention in ecoder')
     parser.add_argument('--do_predict', action='store_true', default=True, help='whether to predict unseen future data') # default=False
@@ -149,25 +152,15 @@ def main():
         for ii in range(args.itr):
             # setting record of experiments
             # setting = '{}_{}_{}_modes{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_fc{}_eb{}_dt{}_{}_{}'.format(
-            setting='{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_{}'.format(
-                args.task_id,
+            setting='{}_{}_{}_sl{}_ll{}_pl{}_el{}_dl{}_df{}'.format(
                 args.model,
-                # args.mode_select, # for FEDformer, there are two mode selection method, options: [random, low]
-                # args.modes, # modes to be selected random 64
-                args.data, # dataset type
-                args.features, # forecasting task, options: [M, S, MS]
+                args.data,
+                args.product,
                 args.seq_len,
                 args.label_len,
                 args.pred_len,
-                args.d_model,
-                args.n_heads,
                 args.e_layers,
                 args.d_layers,
-                args.d_ff, # dimension of fcn
-                # args.factor, # attn factor
-                # args.embed, # time features encoding, options:[timeF, fixed, learned]
-                # args.distil, # whether to use distilling in encoder, using this argument means not using distilling
-                # args.des, # exp description
                 ii)
 
             exp = Exp(args)  # set experiments 初始化
@@ -177,30 +170,19 @@ def main():
             print('>>>>>>>testing : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
             exp.test(setting)
 
-            if args.do_predict:
-                print('>>>>>>>predicting : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
-                exp.predict(setting, True)
-
             torch.cuda.empty_cache()
     else:
         ii = 0
-        setting = '{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_fc{}_eb{}_dt{}_{}_{}'.format(args.task_id,
-                                                                                                      args.model,
-                                                                                                      args.data,
-                                                                                                      args.features,
-                                                                                                      args.seq_len,
-                                                                                                      args.label_len,
-                                                                                                      args.pred_len,
-                                                                                                      args.d_model,
-                                                                                                      args.n_heads,
-                                                                                                      args.e_layers,
-                                                                                                      args.d_layers,
-                                                                                                      args.d_ff,
-                                                                                                      args.factor,
-                                                                                                      args.embed,
-                                                                                                      args.distil,
-                                                                                                      args.des,
-                                                                                                      ii)
+        setting = '{}_{}_{}_sl{}_ll{}_pl{}_el{}_dl{}_df{}'.format(
+            args.model,
+            args.data,
+            args.product,
+            args.seq_len,
+            args.label_len,
+            args.pred_len,
+            args.e_layers,
+            args.d_layers,
+            ii)
 
         exp = Exp(args)  # set experiments
         print('>>>>>>>testing : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))

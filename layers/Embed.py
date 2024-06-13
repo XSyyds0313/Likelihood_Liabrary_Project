@@ -70,15 +70,18 @@ class TemporalEmbedding(nn.Module):
     def __init__(self, d_model, embed_type='fixed', freq='h'):
         super(TemporalEmbedding, self).__init__()
         # 每个时间单位的取值数量
-        minute_size = 4
+        millisecond_size = 510
+        second_size = 60
+        minute_size = 60
         hour_size = 24
         weekday_size = 7
         day_size = 32
         month_size = 13
 
         Embed = FixedEmbedding if embed_type == 'fixed' else nn.Embedding
-        if freq == 't':
-            self.minute_embed = Embed(minute_size, d_model)
+        self.millisecond_embed = Embed(millisecond_size, d_model)
+        self.second_embed = Embed(second_size, d_model)
+        self.minute_embed = Embed(minute_size, d_model)
         self.hour_embed = Embed(hour_size, d_model)
         self.weekday_embed = Embed(weekday_size, d_model)
         self.day_embed = Embed(day_size, d_model)
@@ -86,14 +89,16 @@ class TemporalEmbedding(nn.Module):
 
     def forward(self, x):
         x = x.long()
-
-        minute_x = self.minute_embed(x[:, :, 4]) if hasattr(self, 'minute_embed') else 0.
+        # millisecond_x = self.minute_embed(x[:, :, 6])
+        second_x = self.minute_embed(x[:, :, 5])
+        minute_x = self.minute_embed(x[:, :, 4])
         hour_x = self.hour_embed(x[:, :, 3])
         weekday_x = self.weekday_embed(x[:, :, 2])
         day_x = self.day_embed(x[:, :, 1])
         month_x = self.month_embed(x[:, :, 0])
 
-        return hour_x + weekday_x + day_x + month_x + minute_x # 位置信息加和
+        # return hour_x + weekday_x + day_x + month_x + minute_x + second_x + millisecond_x # 位置信息加和 todo
+        return hour_x + weekday_x + day_x + month_x + minute_x + second_x  # 位置信息加和
 
 class TimeFeatureEmbedding(nn.Module):
     def __init__(self, d_model, embed_type='timeF', freq='h'):

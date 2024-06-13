@@ -1,16 +1,19 @@
 import os
 import time
 import numpy as np
+import pandas as pd
 import torch
 import torch.nn as nn
 from torch import optim
 
 from exp.exp_basic import Exp_Basic
-from data_provider.data_factory import data_provider, data_provider_task
+from data_provider.data_factory import train_data_provider, test_data_provider
 from utils.tools import EarlyStopping, adjust_learning_rate, visual
-from utils.metrics import metric
+from utils.metrics import metric, classify_metric
+from utils.tasks import Task12, Task3, Task4
+from utils.helper_functions import save, load, parLapply
 
-from models import FEDformer, Autoformer, Informer, Transformer, Crossformer
+from models import FEDformer, Autoformer, Informer, Transformer, Crossformer, xLSTM
 from ns_models import ns_Transformer, ns_Informer, ns_Autoformer
 from i_models import iTransformer, iInformer
 
@@ -18,45 +21,10 @@ import warnings
 warnings.filterwarnings('ignore')
 
 
-class Task1(nn.Module):
-    def __init__(self, configs):
-        super(Task1, self).__init__()
-        self.fc1 = nn.Linear(configs.c_out, 1)
-
-    def forward(self, output):
-        output = self.fc1(output)
-        return output
-
-class Task3(nn.Module):
-    def __init__(self, configs):
-        super(Task3, self).__init__()
-        self.pred_len = configs.pred_len
-        self.num_classes = configs.num_classes
-        self.fc3 = nn.Linear(configs.c_out * configs.pred_len, self.num_classes)
-
-    def forward(self, output):
-        batch_size, _, dec_in = output.shape
-        output = output.view(batch_size, self.pred_len * dec_in)
-        output = self.fc3(output)
-        output = torch.softmax(output, dim=1)
-        return output
-
-class Task4(nn.Module):
-    def __init__(self, configs):
-        super(Task4, self).__init__()
-        self.pred_len = configs.pred_len
-        self.fc4 = nn.Linear(configs.c_out * configs.pred_len, 1)
-
-    def forward(self, output):
-        batch_size, _, dec_in = output.shape
-        output = output.view(batch_size, self.pred_len * dec_in)
-        output = self.fc4(output)
-        return output
-
 class Exp_Main(Exp_Basic):
     def __init__(self, args):
         super(Exp_Main, self).__init__(args)
-        task_set = {"task1":Task1, "task2":Task1, "task3":Task3, "task4":Task4}
+        task_set = {"task1":Task12, "task2":Task12, "task3":Task3, "task4":Task4}
         self.task_object = task_set[self.args.data](self.args)
 
     def _build_model(self):
@@ -72,6 +40,7 @@ class Exp_Main(Exp_Basic):
             'iTransformer': iTransformer,
             'iInformer': iInformer,
             'Crossformer': Crossformer,
+            'xLSTM': xLSTM,
         }
         model = model_dict[self.args.model].Model(self.args).float()
 
@@ -79,10 +48,16 @@ class Exp_Main(Exp_Basic):
             model = nn.DataParallel(model, device_ids=self.args.device_ids)
         return model
 
-    def _get_data(self, flag):
+    def _get_train_data(self, flag):
+        """train, test, predict3个阶段时调用, flag is in ['train', 'val'], 获取data_loder"""
+        # data_set, data_loader = data_provider(self.args, flag)
+        data_set, data_loader = train_data_provider(self.args, flag)
+        return data_set, data_loader
+
+    def _get_test_data(self, date):
         """train, test, predict3个阶段时调用, flag is in ['train', 'val', 'test', 'predict'], 获取data_loder"""
         # data_set, data_loader = data_provider(self.args, flag)
-        data_set, data_loader = data_provider_task(self.args, flag)
+        data_set, data_loader = test_data_provider(self.args, date)
         return data_set, data_loader
 
     def _select_optimizer(self):
@@ -97,11 +72,15 @@ class Exp_Main(Exp_Basic):
 
     def train(self, setting):
         """训练函数"""
-        train_data, train_loader = self._get_data(flag='train')
-        vali_data, vali_loader = self._get_data(flag='val')
-        test_data, test_loader = self._get_data(flag='test')
+        scale_folder_path = './fit_scale/' + self.args.data + '/' + self.args.product
+        if not os.path.exists(scale_folder_path):
+            os.makedirs(scale_folder_path)
 
-        path = os.path.join(self.args.checkpoints, setting)
+        train_data, train_loader = self._get_train_data(flag='train')
+        vali_data, vali_loader = self._get_train_data(flag='vali')
+
+        # path = os.path.join(self.args.checkpoints, setting)
+        path = self.args.checkpoints + self.args.data + '/' + self.args.product
         if not os.path.exists(path):
             os.makedirs(path)
 
@@ -134,6 +113,7 @@ class Exp_Main(Exp_Basic):
                 batch_y = batch_y.float().to(self.device)
                 batch_x_mark = batch_x_mark.float().to(self.device)
                 batch_y_mark = batch_y_mark.float().to(self.device)
+                label = label[:, self.args.seq_len:, :] # label is (B, L, 1)
 
                 # decoder input
                 # dec_inp表示将batch_y的第二个维度label_len+pre_len, pre_len部分用0代替
@@ -147,25 +127,18 @@ class Exp_Main(Exp_Basic):
                             outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
                         else:
                             outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
-
-                        f_dim = -1 if self.args.features == 'MS' else 0 # todo
-                        outputs = outputs[:, -self.args.pred_len:, f_dim:]
-                        pred = self.task_object(outputs)
-                        label = label.squeeze()
-                        loss = criterion(pred, label)
-                        train_loss.append(loss.item())
                 else:
                     if self.args.output_attention:
                         outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
                     else:
                         outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
 
-                    f_dim = -1 if self.args.features == 'MS' else 0
-                    outputs = outputs[:, -self.args.pred_len:, f_dim:]
-                    pred = self.task_object(outputs) # (B, L, 1) or (B, 1)    label is (B, L, 1) or (B, 1, 1)
-                    label = label.view(pred.shape)
-                    loss = criterion(pred, label)
-                    train_loss.append(loss.item())
+                outputs = outputs[:, -self.args.pred_len:, :]
+                pred = self.task_object(outputs)  # pred is (B, L, 1) or (B, 3) or (B, 1)
+                pred, label = self.task_object.reshape_pred_label(pred, label)  # pred and label is (B, L, 1) or (B, 1) or (B, 1)
+                pred, label = pred.float(), label.float()
+                loss = criterion(pred, label)
+                train_loss.append(loss.item())
 
                 if (i + 1) % 100 == 0: # 每100个批次重置iter_count并计算剩余时间
                     print("\titers: {0}, epoch: {1} | loss: {2:.7f}".format(i + 1, epoch + 1, loss.item()))
@@ -186,10 +159,8 @@ class Exp_Main(Exp_Basic):
             print("Epoch: {} cost time: {}".format(epoch + 1, time.time() - epoch_time))
             train_loss = np.average(train_loss)
             vali_loss = self.vali(vali_data, vali_loader, criterion) # 验证训练得到的模型在验证集上的损失
-            test_loss = self.vali(test_data, test_loader, criterion) # 验证训练得到的模型在测试集上的损失
 
-            print("Epoch: {0}, Steps: {1} | Train Loss: {2:.7f} Vali Loss: {3:.7f} Test Loss: {4:.7f}".format(
-                epoch + 1, train_steps, train_loss, vali_loss, test_loss))
+            print("Epoch: {0}, Steps: {1} | Train Loss: {2:.7f} Vali Loss: {3:.7f}".format(epoch + 1, train_steps, train_loss, vali_loss))
             early_stopping(vali_loss, self.model, path) # 根据验证集损失判断是否提前停止并不断保存模型状态字典
             if early_stopping.early_stop: # 若提前停止则跳出epoch循环
                 print("Early stopping")
@@ -212,6 +183,7 @@ class Exp_Main(Exp_Basic):
                 batch_y = batch_y.float()
                 batch_x_mark = batch_x_mark.float().to(self.device)
                 batch_y_mark = batch_y_mark.float().to(self.device)
+                label = label[:, self.args.seq_len:, :]  # label is (B, L, 1)
 
                 # decoder input
                 dec_inp = torch.zeros_like(batch_y[:, -self.args.pred_len:, :]).float()
@@ -228,10 +200,10 @@ class Exp_Main(Exp_Basic):
                         outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
                     else:
                         outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
-                f_dim = -1 if self.args.features == 'MS' else 0
-                outputs = outputs[:, -self.args.pred_len:, f_dim:] #
-                pred = self.task_object(outputs).detach().cpu() # (B, L, 1) or (B, 1)    label is (B, L, 1) or (B, 1, 1)
-                label = label.view(pred.shape).detach().cpu()
+                outputs = outputs[:, -self.args.pred_len:, :]
+                pred = self.task_object(outputs)  # pred is (B, L, 1) or (B, 3) or (B, 1)
+                pred, label = self.task_object.reshape_pred_label(pred, label)  # pred and label is (B, L, 1) or (B, 1) or (B, 1)
+                pred, label = pred.detach().cpu(), label.detach().cpu()
                 loss = criterion(pred, label)
                 total_loss.append(loss)
 
@@ -241,151 +213,93 @@ class Exp_Main(Exp_Basic):
 
     def test(self, setting, test=0):
         """测试函数"""
-        test_data, test_loader = self._get_data(flag='test')
         if test:
             print('loading model')
-            self.model.load_state_dict(torch.load(os.path.join('./checkpoints/' + setting, 'checkpoint.pth')))
+            # self.model.load_state_dict(torch.load(os.path.join('./checkpoints/' + setting, 'checkpoint.pth')))
+            self.model.load_state_dict(torch.load(self.args.checkpoints + self.args.data + '/' + self.args.product + '/checkpoint.pth'))
 
-        preds = []
-        trues = []
-        folder_path = './test_results/' + setting + '/' # 用于保存true和predict的图片
-        if not os.path.exists(folder_path):
-            os.makedirs(folder_path)
+        picture_folder_path = './picture_results/' + self.args.data + '/' + self.args.product + '/' # 用于保存true和predict的图片
+        if not os.path.exists(picture_folder_path):
+            os.makedirs(picture_folder_path)
+        # result save
+        metrics_folder_path = './metrics_results/' + self.args.data + '/' + self.args.product + '/'  # 用于保存指标数据
+        if not os.path.exists(metrics_folder_path):
+            os.makedirs(metrics_folder_path)
 
         self.model.eval()
-        with torch.no_grad():
-            for i, (batch_x, batch_y, batch_x_mark, batch_y_mark, label) in enumerate(test_loader):
-                batch_x = batch_x.float().to(self.device)
-                batch_y = batch_y.float().to(self.device)
-                batch_x_mark = batch_x_mark.float().to(self.device)
-                batch_y_mark = batch_y_mark.float().to(self.device)
 
-                # decoder input
-                dec_inp = torch.zeros_like(batch_y[:, -self.args.pred_len:, :]).float()
-                dec_inp = torch.cat([batch_y[:, :self.args.label_len, :], dec_inp], dim=1).float().to(self.device)
-                # encoder - decoder
-                if self.args.use_amp:
-                    with torch.cuda.amp.autocast():
+        def test_each_date(date):
+            test_data, test_loader = self._get_test_data(date=date)
+            timestamps = []
+            preds = []
+            trues = []
+            all_times = load(self.args.data_path+self.args.product+'/'+date+'.pkl')
+            all_times = list(all_times['TimeStamp'])
+
+            with torch.no_grad():
+                for i, (batch_x, batch_y, batch_x_mark, batch_y_mark, label_all) in enumerate(test_loader):
+                    batch_x = batch_x.float().to(self.device)
+                    batch_y = batch_y.float().to(self.device)
+                    batch_x_mark = batch_x_mark.float().to(self.device)
+                    batch_y_mark = batch_y_mark.float().to(self.device)
+                    label = label_all[:, self.args.seq_len:, :]  # label is (1, L, 1)
+
+                    # decoder input
+                    dec_inp = torch.zeros_like(batch_y[:, -self.args.pred_len:, :]).float()
+                    dec_inp = torch.cat([batch_y[:, :self.args.label_len, :], dec_inp], dim=1).float().to(self.device)
+                    # encoder - decoder
+                    if self.args.use_amp:
+                        with torch.cuda.amp.autocast():
+                            if self.args.output_attention:
+                                outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
+                            else:
+                                outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
+                    else:
                         if self.args.output_attention:
                             outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
                         else:
                             outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
-                else:
-                    if self.args.output_attention:
-                        outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
-                    else:
-                        outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
 
-                f_dim = -1 if self.args.features == 'MS' else 0
-                outputs = outputs[:, -self.args.pred_len:, f_dim:]
-                pred = self.task_object(outputs).detach().cpu().numpy()
-                label = label.squeeze().detach().cpu().numpy()
+                    outputs = outputs[:, -self.args.pred_len:, :]
+                    pred = self.task_object(outputs)  # pred is (1, L, 1) or (1, 3) or (1, 1)
+                    pred, label = self.task_object.reshape_pred_label(pred, label)  # pred and label is (1, L, 1) or (1, 1) or (1, 1)
+                    pred, label = pred.detach().cpu().numpy(), label.detach().cpu().numpy()
 
-                if test_data.scale and self.args.inverse:
-                    shape = outputs.shape
-                    pred = test_data.inverse_transform(pred.squeeze(0)).reshape(shape)
-                    label = test_data.inverse_transform(label.squeeze(0)).reshape(shape)
+                    if test_data.scale and self.args.inverse:
+                        shape = pred.shape
+                        pred = test_data.inverse_transform(pred.squeeze(0)).reshape(shape)
+                        label = test_data.inverse_transform(label.squeeze(0)).reshape(shape)
 
-                preds.append(pred)
-                trues.append(label)
+                    timestamps.append(all_times[i+self.args.seq_len])
+                    preds.append(pred)
+                    trues.append(label)
 
-                # if i % 20 == 0:
-                #     input = batch_x.detach().cpu().numpy()
-                #     if test_data.scale and self.args.inverse:
-                #         shape = input.shape
-                #         input = test_data.inverse_transform(input.squeeze(0)).reshape(shape)
-                #     gt = np.concatenate((input[0, :, -1], label[0, :, -1]), axis=0) # input(seq_len)和true(pre_len)拼接起来
-                #     pd = np.concatenate((input[0, :, -1], pred[0, :, -1]), axis=0) # input(seq_len)和predict(pre_len)拼接起来
-                #     visual(gt, pd, os.path.join(folder_path, str(i) + '.pdf')) # 可视化并保存
+                    if self.args.data == "task1":
+                        if i % 4096 == 0:
+                            gt = label_all
+                            pr = np.concatenate((label_all[:, :self.args.seq_len, :], pred), axis=1)
+                            visual(gt, pr, os.path.join(picture_folder_path, date + "_" + str(i//4096) + '.pdf'))  # 可视化并保存
 
-        if self.args.data == "task1":
-            pass
-        elif self.args.data == "task2":
-            pass
-        elif self.args.data == "task3":
-            pass
-        elif self.args.data == "task4":
-            pass
+            preds = np.array(preds)
+            trues = np.array(trues)
+            timestamps = np.array(timestamps) # (n)
+            preds = preds.reshape(-1, preds.shape[-2], preds.shape[-1]) # (n, L, 1) or (n, 1) or (n, 1)
+            trues = trues.reshape(-1, trues.shape[-2], trues.shape[-1]) # (n, L, 1) or (n, 1) or (n, 1)
+            print('test shape:', preds.shape, trues.shape)
+
+            task_object = self.task_object
+            task_object.finish_task(date, preds, trues, timestamps, setting, metrics_folder_path)
+
+
+        if self.args.data == 'task4':
+            all_dates = np.array(os.listdir(self.args.data_path + self.args.product))
+            test_start = np.where(all_dates == self.args.vali_test_split + ".pkl")
+            test_day_list = all_dates[test_start:]
         else:
-            return None
+            test_day_list = self.args.test_day_list
 
+        parLapply(self.args.CORE_NUM, test_day_list, test_each_date)
 
-        preds = np.array(preds)
-        trues = np.array(trues)
-        print('test shape:', preds.shape, trues.shape)
-        preds = preds.reshape(-1, preds.shape[-2], preds.shape[-1])
-        trues = trues.reshape(-1, trues.shape[-2], trues.shape[-1])
-        print('test shape:', preds.shape, trues.shape)
-
-        # result save
-        folder_path = './results/' + setting + '/' # 用于保存指标数据
-        if not os.path.exists(folder_path):
-            os.makedirs(folder_path)
-
-        mae, mse, rmse, mape, mspe = metric(preds, trues) # 计算误差指标
-        print('mse:{}, mae:{}'.format(mse, mae))
-        f = open("result.txt", 'a')
-        f.write(setting + "  \n")
-        f.write('mse:{}, mae:{}'.format(mse, mae))
-        f.write('\n')
-        f.write('\n')
-        f.close()
-
-
-        np.save(folder_path + 'metrics.npy', np.array([mae, mse, rmse, mape, mspe]))
-        np.save(folder_path + 'pred.npy', preds)
-        np.save(folder_path + 'true.npy', trues)
 
         return
 
-    def predict(self, setting, load=False):
-        """预测函数"""
-        pred_data, pred_loader = self._get_data(flag='pred')
-
-        if load:
-            path = os.path.join(self.args.checkpoints, setting)
-            best_model_path = path + '/' + 'checkpoint.pth'
-            self.model.load_state_dict(torch.load(best_model_path))
-
-        preds = []
-
-        self.model.eval()
-        with torch.no_grad():
-            for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(pred_loader): # pre阶段的batch_size是1
-                batch_x = batch_x.float().to(self.device)
-                batch_y = batch_y.float()
-                batch_x_mark = batch_x_mark.float().to(self.device)
-                batch_y_mark = batch_y_mark.float().to(self.device)
-
-                # decoder input
-                dec_inp = torch.zeros_like(batch_y[:, -self.args.pred_len:, :]).float()
-                dec_inp = torch.cat([batch_y[:, :self.args.label_len, :], dec_inp], dim=1).float().to(self.device)
-                # encoder - decoder
-                if self.args.use_amp:
-                    with torch.cuda.amp.autocast():
-                        if self.args.output_attention:
-                            outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
-                        else:
-                            outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
-                else:
-                    if self.args.output_attention:
-                        outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
-                    else:
-                        outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
-                pred = outputs.detach().cpu().numpy()  # .squeeze()
-                if pred_data.scale and self.args.inverse:
-                    shape = pred.shape
-                    pred = pred_data.inverse_transform(outputs.squeeze(0)).reshape(shape)
-                preds.append(pred)
-
-        preds = np.array(preds)
-        preds = preds.reshape(-1, preds.shape[-2], preds.shape[-1])
-
-        # result save
-        folder_path = './results/' + setting + '/'
-        if not os.path.exists(folder_path):
-            os.makedirs(folder_path)
-
-        np.save(folder_path + 'real_prediction.npy', preds)
-
-        return
