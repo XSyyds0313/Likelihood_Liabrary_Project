@@ -228,12 +228,12 @@ class Exp_Main(Exp_Basic):
 
         self.model.eval()
 
-        def test_each_date(date):
-            test_data, test_loader = self._get_test_data(date=date)
+        def test_each_date(date_pkl):
+            test_data, test_loader = self._get_test_data(date=date_pkl[:8])
             timestamps = []
             preds = []
             trues = []
-            all_times = load(self.args.data_path+self.args.product+'/'+date+'.pkl')
+            all_times = load(self.args.data_path+self.args.product+'/'+date_pkl)
             all_times = list(all_times['TimeStamp'])
 
             with torch.no_grad():
@@ -278,7 +278,7 @@ class Exp_Main(Exp_Basic):
                         if i % 4096 == 0:
                             gt = label_all
                             pr = np.concatenate((label_all[:, :self.args.seq_len, :], pred), axis=1)
-                            visual(gt, pr, os.path.join(picture_folder_path, date + "_" + str(i//4096) + '.pdf'))  # 可视化并保存
+                            visual(gt, pr, os.path.join(picture_folder_path, date_pkl[:8] + "_" + str(i//4096) + '.pdf'))  # 可视化并保存
 
             preds = np.array(preds)
             trues = np.array(trues)
@@ -288,17 +288,17 @@ class Exp_Main(Exp_Basic):
             print('test shape:', preds.shape, trues.shape)
 
             task_object = self.task_object
-            task_object.finish_task(date, preds, trues, timestamps, setting, metrics_folder_path)
+            task_object.finish_task(date_pkl, preds, trues, timestamps, setting, metrics_folder_path)
 
 
         if self.args.data == 'task4':
             all_dates = np.array(os.listdir(self.args.data_path + self.args.product))
-            test_start = np.where(all_dates == self.args.vali_test_split + ".pkl")
-            test_day_list = all_dates[test_start:]
+            test_start = np.where(all_dates == self.args.vali_test_split + ".pkl")[0][0]
+            test_day_pkl_list = all_dates[test_start:]
         else:
-            test_day_list = self.args.test_day_list
+            test_day_pkl_list = [x+'.pkl' for x in self.args.test_day_list]
 
-        parLapply(self.args.CORE_NUM, test_day_list, test_each_date)
+        parLapply(self.args.CORE_NUM, test_day_pkl_list, test_each_date)
 
 
         return

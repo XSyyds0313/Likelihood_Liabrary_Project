@@ -36,14 +36,13 @@ def main():
     parser = argparse.ArgumentParser(description='Transformer-based models for Time Series Forecasting')
 
     # basic config
-    parser.add_argument('--CORE_NUM', type=int, default=int(os.environ['NUMBER_OF_PROCESSORS']), help='core of your computer')
-    parser.add_argument('--is_training', type=int, default=1, help='status') # todo
+    parser.add_argument('--CORE_NUM', type=int, default=int(os.environ['NUMBER_OF_PROCESSORS'])-2, help='core of your computer')
+    parser.add_argument('--is_training', type=int, default=0, help='status') # todo
     parser.add_argument('--model', type=str, default='Transformer',
                         help='model name, options: [Transformer, Informer, Autoformer, FEDformer, ns_Transformer, ns_Informer, ns_Autoformer, iTransformer, iInformer, Crossformer]')
     parser.add_argument('--product', type=str, default='cu', help='product')
 
     # task
-    parser.add_argument('--task_id', type=str, default='test', help='task id')
     parser.add_argument('--train_vali_split', type=str, default='20220105', help='the start day of vali set')
     parser.add_argument('--vali_test_split', type=str, default='20220106', help='the start day of test set')
     parser.add_argument('--test_day_list', type=str, default=['20220601', '20220602'], help='day list used for test in task1 and task2 and task3')
@@ -52,7 +51,7 @@ def main():
     parser.add_argument('--num_class', type=str, default=3, help='classes of ret')
 
     # data loader
-    parser.add_argument('--data', type=str, default='task2', help='dataset: [task1, task2, task3, task4]')
+    parser.add_argument('--data', type=str, default='task4', help='dataset: [task1, task2, task3, task4]')
     parser.add_argument('--root_path', type=str, default=HEAD_PATH, help='root path of the data file')
     parser.add_argument('--data_path', type=str, default=TMP_DATA_PATH, help='data file')
     parser.add_argument('--features', type=str, default=feature_list, help='features to predict target')

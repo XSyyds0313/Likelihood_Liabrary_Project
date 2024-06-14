@@ -54,15 +54,15 @@ class Task3(nn.Module):
     def reshape_pred_label(self, pred, label):
         # input:  pred is (B, 3);  label is (B, L, 1)
         # output:  pred is (B, 1);  label is (B, 1)
-        max_prob_indices = torch.argmax(pred, dim=1)
-        max_prob_indices = max_prob_indices.view(-1, 1)  # (B,1)
-        mapping = {0: 1, 1: 0, 2: -1}
-        pred = max_prob_indices.apply_(lambda x: mapping[int(x)]) # todo 可能无法求导
+        categories = torch.tensor([-1, 0, 1], dtype=torch.float32)
+        prob_distribution = torch.softmax(pred, dim=1)
+        pred = torch.sum(prob_distribution * categories, dim=1)
         label = label[:, 0, :]
         label = label.view(pred.shape)
         return pred, label
 
     def finish_task(self, date, preds, trues, timestamps, setting, metrics_folder_path):
+        preds, trues = preds.astype(int), trues.astype(int)
         total_accuracy, rise_precision, rise_recall, rise_f_score, down_precision, down_recall, down_f_score, \
             vibrate_precision, vibrate_recall, vibrate_f_score = classify_metric(preds, trues)
         print('total_accuracy:{}'.format(total_accuracy))
