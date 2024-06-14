@@ -134,10 +134,6 @@ class Exp_Main(Exp_Basic):
                     else:
                         outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
 
-                with open(scale_folder_path + '/' + 'scaler.pkl', 'rb') as f:
-                    scaler = pickle.load(f)
-                outputs = scaler.inverse_transform(outputs)
-
                 outputs = outputs[:, -self.args.pred_len:, :]
                 pred = self.task_object(outputs)  # pred is (B, L, 1) or (B, 3) or (B, 1)
                 pred, label = self.task_object.reshape_pred_label(pred, label)  # pred and label is (B, L, 1) or (B, 1) or (B, 1)
@@ -208,10 +204,6 @@ class Exp_Main(Exp_Basic):
                     else:
                         outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
 
-                with open(scale_folder_path + '/' + 'scaler.pkl', 'rb') as f:
-                    scaler = pickle.load(f)
-                outputs = scaler.inverse_transform(outputs)
-
                 outputs = outputs[:, -self.args.pred_len:, :]
                 pred = self.task_object(outputs)  # pred is (B, L, 1) or (B, 3) or (B, 1)
                 pred, label = self.task_object.reshape_pred_label(pred, label)  # pred and label is (B, L, 1) or (B, 1) or (B, 1)
@@ -272,10 +264,6 @@ class Exp_Main(Exp_Basic):
                             outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
                         else:
                             outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
-
-                    with open(scale_folder_path + '/' + 'scaler.pkl', 'rb') as f:
-                        scaler = pickle.load(f)
-                    outputs = scaler.inverse_transform(outputs)
 
                     outputs = outputs[:, -self.args.pred_len:, :]
                     pred = self.task_object(outputs)  # pred is (1, L, 1) or (1, 3) or (1, 1)
