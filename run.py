@@ -37,7 +37,7 @@ def main():
 
     # basic config
     parser.add_argument('--CORE_NUM', type=int, default=int(os.environ['NUMBER_OF_PROCESSORS']), help='core of your computer')
-    parser.add_argument('--is_training', type=int, default=1, help='status') # todo
+    parser.add_argument('--is_training', type=int, default=0, help='status') # todo
     parser.add_argument('--model', type=str, default='Transformer',
                         help='model name, options: [Transformer, Informer, Autoformer, FEDformer, ns_Transformer, ns_Informer, ns_Autoformer, iTransformer, iInformer, Crossformer]')
     parser.add_argument('--product', type=str, default='cu', help='product')

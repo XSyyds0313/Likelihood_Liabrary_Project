@@ -288,7 +288,7 @@ class Exp_Main(Exp_Basic):
             print('test shape:', preds.shape, trues.shape)
 
             task_object = self.task_object
-            task_object.finish_task(date_pkl, preds, trues, timestamps, setting, metrics_folder_path)
+            task_object.finish_task(date_pkl[:8], preds, trues, timestamps, setting, metrics_folder_path)
 
 
         if self.args.data == 'task4':
