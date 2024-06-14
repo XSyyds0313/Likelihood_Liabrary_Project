@@ -298,8 +298,10 @@ class Exp_Main(Exp_Basic):
         else:
             test_day_pkl_list = [x+'.pkl' for x in self.args.test_day_list]
 
-        parLapply(self.args.CORE_NUM, test_day_pkl_list, test_each_date)
-
+        # parLapply(self.args.CORE_NUM, test_day_pkl_list, test_each_date) # 太消耗内存, 不推荐使用
+        for date_pkl in test_day_pkl_list:
+            print(date_pkl)
+            test_each_date(date_pkl)
 
         return
 

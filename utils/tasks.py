@@ -108,6 +108,6 @@ class Task4(nn.Module):
             os.makedirs(factor_folder_path + self.args.product + '/')
 
         df = pd.DataFrame()
-        df["ret"] = preds
+        df["ret"] = preds.reshape(-1)
         df.index = timestamps
         save(df, factor_folder_path + self.args.product + '/' + date + '.pkl')

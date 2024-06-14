@@ -36,7 +36,7 @@ def main():
     parser = argparse.ArgumentParser(description='Transformer-based models for Time Series Forecasting')
 
     # basic config
-    parser.add_argument('--CORE_NUM', type=int, default=int(os.environ['NUMBER_OF_PROCESSORS'])-2, help='core of your computer')
+    parser.add_argument('--CORE_NUM', type=int, default=int(os.environ['NUMBER_OF_PROCESSORS']), help='core of your computer')
     parser.add_argument('--is_training', type=int, default=1, help='status') # todo
     parser.add_argument('--model', type=str, default='Transformer',
                         help='model name, options: [Transformer, Informer, Autoformer, FEDformer, ns_Transformer, ns_Informer, ns_Autoformer, iTransformer, iInformer, Crossformer]')
