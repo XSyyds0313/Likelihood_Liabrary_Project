@@ -37,7 +37,7 @@ def main():
 
     # basic config
     parser.add_argument('--CORE_NUM', type=int, default=int(os.environ['NUMBER_OF_PROCESSORS']), help='core of your computer')
-    parser.add_argument('--is_training', type=int, default=1, help='status') # todo
+    parser.add_argument('--is_training_and_testing', type=int, default=[1,1], help='status') # todo
     parser.add_argument('--model', type=str, default='Transformer',
                         help='model name, options: [Transformer, Informer, Autoformer, FEDformer, ns_Transformer, ns_Informer, ns_Autoformer, iTransformer, iInformer, Crossformer]')
     parser.add_argument('--product', type=str, default='cu', help='product')
@@ -51,15 +51,15 @@ def main():
     parser.add_argument('--num_class', type=str, default=3, help='classes of ret')
 
     # data loader
-    parser.add_argument('--data', type=str, default='task1', help='dataset: [task1, task2, task3, task4]')
+    parser.add_argument('--data', type=str, default='task2', help='dataset: [task1, task2, task3, task4]')  # todo
     parser.add_argument('--root_path', type=str, default=HEAD_PATH, help='root path of the data file')
     parser.add_argument('--data_path', type=str, default=TMP_DATA_PATH, help='data file')
-    parser.add_argument('--features', type=str, default=feature_list, help='features to predict target')
-    parser.add_argument('--target', type=str, default='ret', help='target feature') # todo
-    parser.add_argument('--freq', type=str, default='t', # todo  default='h'
+    parser.add_argument('--features', type=str, default=feature_list, help='features to predict target') # todo
+    parser.add_argument('--target', type=str, default='ret', help='target feature') # todo task1 is weight_price, task2 is difference_of_price, task3 is classify, task4 is ret
+    parser.add_argument('--freq', type=str, default='t',
                         help='freq for time features encoding, options: [s:secondly, t:minutely, h:hourly, d:daily, b:business days, w:weekly, m:monthly], '
                              'you can also use more detailed freq like 15min or 3h')
-    parser.add_argument('--detail_freq', type=str, default='t', help='like freq, but use in predict') # todo  default='h'
+    parser.add_argument('--detail_freq', type=str, default='t', help='like freq, but use in predict')
     parser.add_argument('--checkpoints', type=str, default='./checkpoints/', help='location of model checkpoints')
 
     # forecasting task
@@ -82,14 +82,14 @@ def main():
                         help='whether to use distilling in encoder, using this argument means not using distilling')
     parser.add_argument('--dropout', type=float, default=0.05, help='dropout')
     parser.add_argument('--embed', type=str, default='fixed',
-                        help='time features encoding, options:[timeF, fixed, learned]') # todo
+                        help='time features encoding, options:[timeF, fixed, learned]')
     parser.add_argument('--activation', type=str, default='gelu', help='activation')
     parser.add_argument('--output_attention', action='store_true', default=False, help='whether to output attention in ecoder')
     parser.add_argument('--do_predict', action='store_true', default=True, help='whether to predict unseen future data') # default=False
 
     # optimization
     parser.add_argument('--num_workers', type=int, default=10, help='data loader num workers')
-    parser.add_argument('--itr', type=int, default=1, help='experiments times') # default=3 todo
+    parser.add_argument('--itr', type=int, default=1, help='experiments times') # default=3
     parser.add_argument('--train_epochs', type=int, default=3, help='train epochs') # default=10
     parser.add_argument('--batch_size', type=int, default=32, help='batch size of train input data')
     parser.add_argument('--patience', type=int, default=3, help='early stopping patience')
@@ -146,49 +146,40 @@ def main():
     print(args)
 
     Exp = Exp_Main
+    exp = Exp(args)  # set experiments 初始化
 
-    if args.is_training:
+    if args.is_training_and_testing[0]:
         for ii in range(args.itr):
-            # setting record of experiments
-            # setting = '{}_{}_{}_modes{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_fc{}_eb{}_dt{}_{}_{}'.format(
-            setting='{}_{}_{}_sl{}_ll{}_pl{}_el{}_dl{}_df{}'.format(
-                args.model,
-                args.data,
-                args.product,
-                args.seq_len,
-                args.label_len,
-                args.pred_len,
-                args.e_layers,
-                args.d_layers,
-                ii)
+            setting = '{}_{}_{}_sl{}_ll{}_pl{}_el{}_dl{}_df{}'.format(args.model,
+                                                                      args.data,
+                                                                      args.product,
+                                                                      args.seq_len,
+                                                                      args.label_len,
+                                                                      args.pred_len,
+                                                                      args.e_layers,
+                                                                      args.d_layers,
+                                                                      ii)
 
-            exp = Exp(args)  # set experiments 初始化
             print('>>>>>>>start training : {}>>>>>>>>>>>>>>>>>>>>>>>>>>'.format(setting))
             exp.train(setting)
 
-            print('>>>>>>>testing : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
-            exp.test(setting)
-
-            torch.cuda.empty_cache()
-    else:
+    if args.is_training_and_testing[1]:
         ii = 0
-        setting = '{}_{}_{}_sl{}_ll{}_pl{}_el{}_dl{}_df{}'.format(
-            args.model,
-            args.data,
-            args.product,
-            args.seq_len,
-            args.label_len,
-            args.pred_len,
-            args.e_layers,
-            args.d_layers,
-            ii)
+        setting = '{}_{}_{}_sl{}_ll{}_pl{}_el{}_dl{}_df{}'.format(args.model,
+                                                                  args.data,
+                                                                  args.product,
+                                                                  args.seq_len,
+                                                                  args.label_len,
+                                                                  args.pred_len,
+                                                                  args.e_layers,
+                                                                  args.d_layers,
+                                                                  ii)
 
-        exp = Exp(args)  # set experiments
         print('>>>>>>>testing : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
         exp.test(setting, test=1)
-        torch.cuda.empty_cache()
+
+    torch.cuda.empty_cache()
 
 
 if __name__ == "__main__":
     main()
-    print(1)

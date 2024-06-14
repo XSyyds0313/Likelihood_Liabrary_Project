@@ -97,7 +97,7 @@ class TemporalEmbedding(nn.Module):
         day_x = self.day_embed(x[:, :, 1])
         month_x = self.month_embed(x[:, :, 0])
 
-        # return hour_x + weekday_x + day_x + month_x + minute_x + second_x + millisecond_x # 位置信息加和 todo
+        # return hour_x + weekday_x + day_x + month_x + minute_x + second_x + millisecond_x # 位置信息加和
         return hour_x + weekday_x + day_x + month_x + minute_x + second_x  # 位置信息加和
 
 class TimeFeatureEmbedding(nn.Module):
