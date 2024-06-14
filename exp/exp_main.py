@@ -5,6 +5,7 @@ import pandas as pd
 import torch
 import torch.nn as nn
 from torch import optim
+import pickle
 
 from exp.exp_basic import Exp_Basic
 from data_provider.data_factory import train_data_provider, test_data_provider
@@ -133,6 +134,10 @@ class Exp_Main(Exp_Basic):
                     else:
                         outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
 
+                with open(scale_folder_path + '/' + 'scaler.pkl', 'rb') as f:
+                    scaler = pickle.load(f)
+                outputs = scaler.inverse_transform(outputs)
+
                 outputs = outputs[:, -self.args.pred_len:, :]
                 pred = self.task_object(outputs)  # pred is (B, L, 1) or (B, 3) or (B, 1)
                 pred, label = self.task_object.reshape_pred_label(pred, label)  # pred and label is (B, L, 1) or (B, 1) or (B, 1)
@@ -175,6 +180,8 @@ class Exp_Main(Exp_Basic):
 
     def vali(self, vali_data, vali_loader, criterion):
         """验证函数, 在train函数中调用"""
+        scale_folder_path = './fit_scale/' + self.args.data + '/' + self.args.product
+
         total_loss = []
         self.model.eval() # nn.model.eval()将模型设置为评估模式
         with torch.no_grad(): # 不求导
@@ -200,6 +207,11 @@ class Exp_Main(Exp_Basic):
                         outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
                     else:
                         outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
+
+                with open(scale_folder_path + '/' + 'scaler.pkl', 'rb') as f:
+                    scaler = pickle.load(f)
+                outputs = scaler.inverse_transform(outputs)
+
                 outputs = outputs[:, -self.args.pred_len:, :]
                 pred = self.task_object(outputs)  # pred is (B, L, 1) or (B, 3) or (B, 1)
                 pred, label = self.task_object.reshape_pred_label(pred, label)  # pred and label is (B, L, 1) or (B, 1) or (B, 1)
@@ -229,6 +241,7 @@ class Exp_Main(Exp_Basic):
         self.model.eval()
 
         def test_each_date(date_pkl):
+            scale_folder_path = './fit_scale/' + self.args.data + '/' + self.args.product
             test_data, test_loader = self._get_test_data(date=date_pkl[:8])
             timestamps = []
             preds = []
@@ -259,6 +272,10 @@ class Exp_Main(Exp_Basic):
                             outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
                         else:
                             outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
+
+                    with open(scale_folder_path + '/' + 'scaler.pkl', 'rb') as f:
+                        scaler = pickle.load(f)
+                    outputs = scaler.inverse_transform(outputs)
 
                     outputs = outputs[:, -self.args.pred_len:, :]
                     pred = self.task_object(outputs)  # pred is (1, L, 1) or (1, 3) or (1, 1)
