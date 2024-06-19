@@ -13,6 +13,7 @@ from utils.tools import EarlyStopping, adjust_learning_rate, visual
 from utils.metrics import metric, classify_metric
 from utils.tasks import Task12, Task3, Task4
 from utils.helper_functions import save, load, parLapply
+from utils.backtest_functions import calculate_evaluate_signal, train_and_test
 
 from models import FEDformer, Autoformer, Informer, Transformer, Crossformer, xLSTM
 from ns_models import ns_Transformer, ns_Informer, ns_Autoformer
@@ -309,4 +310,34 @@ class Exp_Main(Exp_Basic):
             test_each_date(date_pkl)
 
         return
+
+    def backtest(self):
+        all_dates_pkl = np.array(os.listdir(self.args.data_path + self.args.product))
+        train_sample = (np.array(all_dates_pkl) > self.args.train_set[0]) & (np.array(all_dates_pkl) < self.args.train_set[1])
+        test_sample = (np.array(all_dates_pkl) > self.args.test_set[0]) & (np.array(all_dates_pkl) < self.args.test_set[1])
+        date_str = [n[0:8] for n in all_dates_pkl]
+        format_dates = np.array([pd.to_datetime(d) for d in date_str])
+
+        calculate_evaluate_signal(product_list=[self.args.product],
+                                  all_dates_pkl=all_dates_pkl,
+                                  signal_name=self.args.target,
+                                  HEAD_PATH=self.args.root_path,
+                                  DATA_PATH=self.args.data_path,
+                                  SIGNAL_PATH=self.args.root_path+self.args.target+'/',
+                                  train_sample=train_sample,
+                                  test_sample=test_sample,
+                                  test_month=self.args.test_set[0],
+                                  save_path="signal result/",
+                                  reverse=1)
+
+        train_and_test(product_list=[self.args.product],
+                       format_dates=format_dates,
+                       signal_name=self.args.target,
+                       train_sample=train_sample,
+                       test_sample=test_sample,
+                       min_pnl=2, # todo
+                       min_num=10, # todo
+                       test_month=self.args.test_set[0],
+                       HEAD_PATH=self.args.root_path,
+                       save_path="signal result/")
 

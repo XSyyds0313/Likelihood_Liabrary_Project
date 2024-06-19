@@ -1,12 +1,5 @@
-from data_provider.data_loader import Dataset_task12, Dataset_task3, Dataset_task4
+from data_provider.data_loader import Dataset_task
 from torch.utils.data import DataLoader
-
-data_dict = {
-    'task1': Dataset_task12,
-    'task2': Dataset_task12,
-    'task3': Dataset_task3,
-    'task4': Dataset_task4,
-}
 
 
 def train_data_provider(args, flag="train"):
@@ -16,7 +9,7 @@ def train_data_provider(args, flag="train"):
     return: data_set: 初始化的Data对象;
             data_loader: DataLoader对象
     """
-    Data = data_dict[args.data]
+    Data = Dataset_task
     timeenc = 0 if args.embed != 'timeF' else 1
 
     shuffle_flag = True
@@ -34,8 +27,8 @@ def train_data_provider(args, flag="train"):
                     freq=freq,
                     product=args.product,
                     data=args.data,
-                    train_vali_split=args.train_vali_split,
-                    vali_test_split=args.vali_test_split)
+                    vali_set=args.vali_set,
+                    train_set=args.train_set)
     print(flag, len(data_set))
     data_loader = DataLoader(data_set,
                              batch_size=batch_size,
@@ -52,7 +45,7 @@ def test_data_provider(args, date="20220601"):
     return: data_set: 初始化的Data对象;
             data_loader: DataLoader对象
     """
-    Data = data_dict[args.data]
+    Data = Dataset_task
     timeenc = 0 if args.embed != 'timeF' else 1
 
     shuffle_flag = False
@@ -70,8 +63,8 @@ def test_data_provider(args, date="20220601"):
                     freq=freq,
                     product=args.product,
                     data=args.data,
-                    train_vali_split=args.train_vali_split,
-                    vali_test_split=args.vali_test_split,
+                    vali_set=args.vali_set,
+                    train_set=args.train_set,
                     test_date = date)
 
     data_loader = DataLoader(data_set,

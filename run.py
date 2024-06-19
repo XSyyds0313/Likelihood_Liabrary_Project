@@ -9,18 +9,17 @@ from exp.exp_main import Exp_Main
 
 
 # 根目录HEAD_PATH
-HEAD_PATH = "order book data"
-# 数据保存根目录
-SAVE_PATH = "order book data"
+HEAD_PATH = "order book data/"
 # 样本的目录
-DATA_PATH_1 = HEAD_PATH + "/order book tick/"
-DATA_PATH_2 = HEAD_PATH + "/order flow tick/"
-# TMP_DATA_PATH = HEAD_PATH + "/tmp pkl/"
-TMP_DATA_PATH = HEAD_PATH + "/tmp debug/"
-product_list = ["cu", "zn", "ni"]
+DATA_PATH_1 = HEAD_PATH + "order book tick/"
+DATA_PATH_2 = HEAD_PATH + "order flow tick/"
+# TMP_DATA_PATH = HEAD_PATH + "tmp pkl/"
+TMP_DATA_PATH = HEAD_PATH + "tmp debug/"
+vali_set = ['202201', '202202']
+train_set = ['202202', '202204']
+test_set = ['202204', '202205']
+product_list = ["cu", "zn", "ni", "au", "ag"]
 product = "cu"
-train_vali_split = "20220501"
-vali_test_split = "20220601"
 feature_list = ['BidPrice1', 'BidVolume1', 'AskPrice1', 'AskVolume1',
                 'BidPrice2', 'BidVolume2', 'AskPrice2', 'AskVolume2',
                 'BidPrice3', 'BidVolume3', 'AskPrice3', 'AskVolume3',
@@ -37,21 +36,22 @@ def main():
 
     # basic config
     parser.add_argument('--CORE_NUM', type=int, default=int(os.environ['NUMBER_OF_PROCESSORS']), help='core of your computer')
-    parser.add_argument('--is_training_and_testing', type=int, default=[1,1], help='status') # todo
+    parser.add_argument('--is_training_and_testing', type=int, default=[0,1], help='status') # todo
     parser.add_argument('--model', type=str, default='Transformer',
                         help='model name, options: [Transformer, Informer, Autoformer, FEDformer, ns_Transformer, ns_Informer, ns_Autoformer, iTransformer, iInformer, Crossformer]')
     parser.add_argument('--product', type=str, default='cu', help='product')
 
     # task
-    parser.add_argument('--train_vali_split', type=str, default='20220105', help='the start day of vali set')
-    parser.add_argument('--vali_test_split', type=str, default='20220106', help='the start day of test set')
+    parser.add_argument('--vali_set', type=str, default=['20220104', '20220105'], help='the start day and end day of vali set')
+    parser.add_argument('--train_set', type=str, default=['20220105','20220106'], help='the start day and end day of train set')
+    parser.add_argument('--test_set', type=str, default=['20220106', '20220107'], help='the start day and end day of test set')
     parser.add_argument('--test_day_list', type=str, default=['20220601', '20220602'], help='day list used for test in task1 and task2 and task3')
 
     # task 3
     parser.add_argument('--num_class', type=str, default=3, help='classes of ret')
 
     # data loader
-    parser.add_argument('--data', type=str, default='task2', help='dataset: [task1, task2, task3, task4]')  # todo
+    parser.add_argument('--data', type=str, default='task4', help='dataset: [task1, task2, task3, task4]')  # todo
     parser.add_argument('--root_path', type=str, default=HEAD_PATH, help='root path of the data file')
     parser.add_argument('--data_path', type=str, default=TMP_DATA_PATH, help='data file')
     parser.add_argument('--features', type=str, default=feature_list, help='features to predict target') # todo
@@ -177,6 +177,8 @@ def main():
 
         print('>>>>>>>testing : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
         exp.test(setting, test=1)
+        if args.data == "task4":
+            exp.backtest()
 
     torch.cuda.empty_cache()
 
