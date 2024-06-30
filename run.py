@@ -15,8 +15,8 @@ DATA_PATH_1 = HEAD_PATH + "order book tick/"
 DATA_PATH_2 = HEAD_PATH + "order flow tick/"
 # TMP_DATA_PATH = HEAD_PATH + "tmp pkl/"
 TMP_DATA_PATH = HEAD_PATH + "tmp debug/"
-vali_set = ['202201', '202202']
-train_set = ['202202', '202204']
+vali_set = ['202201', '202203']
+train_set = ['202203', '202204']
 test_set = ['202204', '202205']
 product_list = ["cu", "zn", "ni", "au", "ag"]
 product = "cu"
@@ -42,8 +42,8 @@ def main():
     parser.add_argument('--product', type=str, default='cu', help='product')
 
     # task
-    parser.add_argument('--vali_set', type=str, default=['20220104', '20220105'], help='the start day and end day of vali set')
-    parser.add_argument('--train_set', type=str, default=['20220105','20220106'], help='the start day and end day of train set')
+    parser.add_argument('--vali_set', type=str, default=['20220105', '20220106'], help='the start day and end day of vali set')
+    parser.add_argument('--train_set', type=str, default=['20220104','20220105'], help='the start day and end day of train set')
     parser.add_argument('--test_set', type=str, default=['20220106', '20220107'], help='the start day and end day of test set')
     parser.add_argument('--test_day_list', type=str, default=['20220601', '20220602'], help='day list used for test in task1 and task2 and task3')
 
@@ -102,7 +102,7 @@ def main():
     # GPU
     parser.add_argument('--use_gpu', type=bool, default=True, help='use gpu')
     parser.add_argument('--gpu', type=int, default=0, help='gpu')
-    parser.add_argument('--use_multi_gpu', action='store_true', default=False, help='use multiple gpus')
+    parser.add_argument('--use_multi_gpu', action='store_true', default=True, help='use multiple gpus')
     parser.add_argument('--devices', type=str, default='0,1', help='device ids of multi gpus')
 
 
