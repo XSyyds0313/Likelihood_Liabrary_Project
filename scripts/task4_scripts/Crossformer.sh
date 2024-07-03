@@ -11,9 +11,9 @@ python -u run.py \
   --is_training_and_testing [1,1] \
   --model 'Crossformer' \
   --product $product \
-  --train_set ['202203', '202205'] \
-  --vali_set ['202205', '202206'] \
-  --test_set ['202206', '202207'] \
+  --train_set ['20220301', '20220505'] \
+  --vali_set ['20220505', '20220601'] \
+  --test_set ['20220601', '20220701'] \
   --test_day_list ['20220601', '20220602'] \
   --data 'task4' \
   --target 'ret' \

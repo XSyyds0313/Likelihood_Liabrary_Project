@@ -299,8 +299,9 @@ class Exp_Main(Exp_Basic):
 
         if self.args.data == 'task4':
             all_dates = np.array(os.listdir(self.args.data_path + self.args.product))
-            test_start = np.where(all_dates == self.args.vali_test_split + ".pkl")[0][0]
-            test_day_pkl_list = all_dates[test_start:]
+            start = np.where(all_dates == self.args.train_set[0] + ".pkl")[0][0]
+            end = np.where(all_dates == self.args.test_set[1] + ".pkl")[0][0] # todo 可能会报错, args的test_set最好精确到日
+            test_day_pkl_list = all_dates[start:end]  # 要注意, 模型训练好后, task4中train和vali的因子也要predict, 回测需要！！！！！！！！！！！！！！
         else:
             test_day_pkl_list = [x+'.pkl' for x in self.args.test_day_list]
 
@@ -314,6 +315,7 @@ class Exp_Main(Exp_Basic):
     def backtest(self):
         all_dates_pkl = np.array(os.listdir(self.args.data_path + self.args.product))
         train_sample = (np.array(all_dates_pkl) > self.args.train_set[0]) & (np.array(all_dates_pkl) < self.args.train_set[1])
+        vali_sample = (np.array(all_dates_pkl) > self.args.vali_set[0]) & (np.array(all_dates_pkl) < self.args.vali_set[1])
         test_sample = (np.array(all_dates_pkl) > self.args.test_set[0]) & (np.array(all_dates_pkl) < self.args.test_set[1])
         date_str = [n[0:8] for n in all_dates_pkl]
         format_dates = np.array([pd.to_datetime(d) for d in date_str])
@@ -325,6 +327,7 @@ class Exp_Main(Exp_Basic):
                                   DATA_PATH=self.args.data_path,
                                   SIGNAL_PATH=self.args.root_path+self.args.target+'/',
                                   train_sample=train_sample,
+                                  vali_sample=vali_sample,
                                   test_sample=test_sample,
                                   test_month=self.args.test_set[0],
                                   save_path="signal result/",
@@ -334,6 +337,7 @@ class Exp_Main(Exp_Basic):
                        format_dates=format_dates,
                        signal_name=self.args.target,
                        train_sample=train_sample,
+                       vali_sample=vali_sample,
                        test_sample=test_sample,
                        min_pnl=2, # todo
                        min_num=10, # todo

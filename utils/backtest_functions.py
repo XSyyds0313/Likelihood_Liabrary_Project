@@ -11,16 +11,12 @@ from utils.product_info import *
 
 # 因子回测的函数
 def get_signal_pnl(file, product, signal_name, thre_mat, reverse=1, tranct=1.1e-4, max_spread=0.61, tranct_ratio=True,
-                   flag='train', test_month='202204', HEAD_PATH="order book data/", DATA_PATH="order book data/tmp pkl/", SIGNAL_PATH="order book data/ret/"): # 因子回测的函数
-    print(flag)
+                   test_month='202204', HEAD_PATH="order book data/", DATA_PATH="order book data/tmp pkl/", SIGNAL_PATH="order book data/ret/"): # 因子回测的函数
     data = load(HEAD_PATH+"order flow tick/"+product+"/"+file)
     # data = data[data["good"]].iloc[:500, :] # todo debug
     data = data[data["good"]]
-    if flag == 'test':
-        S = load(SIGNAL_PATH+test_month+'_'+signal_name+"/"+product+"/"+file)
-        data = data.iloc[:len(S), :] # 将原数据和预测的数据大小适配
-    else:
-        S = load(DATA_PATH+product+"/"+file)
+    S = load(SIGNAL_PATH+test_month+'_'+signal_name+"/"+product+"/"+file)
+    data = data.iloc[:len(S), :] # 将原数据和预测的数据大小适配
     S = S['ret']
     S.reset_index(drop=True, inplace=True)
     pred = S * reverse
@@ -139,28 +135,31 @@ def get_hft_summary(result, thre_mat):
     return OrderedDict([("final.result", final_result), ("daily.num", daily_num), ("daily.pnl", daily_pnl), ("daily.ret", daily_ret)])
 
 # 训练集和测试集分开统计
-def get_signal_stat(signal_name, thre_mat, product, all_dates_pkl, CORE_NUM, train_sample, test_sample, reverse=1, tranct=1.1e-4,
+def get_signal_stat(signal_name, thre_mat, product, all_dates_pkl, CORE_NUM, train_sample, vali_sample, test_sample, reverse=1, tranct=1.1e-4,
                     max_spread=0.61, tranct_ratio=True, test_month='202204', HEAD_PATH="order book data/", DATA_PATH="order book data/tmp pkl/", SIGNAL_PATH="order book data/ret/"):
     # 并行计算训练集每日的回测结果, 整合到train_stat
     train_result = parLapply(CORE_NUM, all_dates_pkl[train_sample], get_signal_pnl, product=product,
                              signal_name=signal_name, thre_mat=thre_mat,
-                             reverse=reverse, tranct=tranct, max_spread=max_spread, tranct_ratio=tranct_ratio,
-                             flag='train',
+                             reverse=reverse, tranct=tranct, max_spread=max_spread, tranct_ratio=tranct_ratio,test_month=test_month,
                              HEAD_PATH=HEAD_PATH, DATA_PATH=DATA_PATH, SIGNAL_PATH=SIGNAL_PATH)
     train_stat = get_hft_summary(train_result, thre_mat)
+    vali_result = parLapply(CORE_NUM, all_dates_pkl[vali_sample], get_signal_pnl, product=product,
+                             signal_name=signal_name, thre_mat=thre_mat,
+                             reverse=reverse, tranct=tranct, max_spread=max_spread, tranct_ratio=tranct_ratio,test_month=test_month,
+                             HEAD_PATH=HEAD_PATH, DATA_PATH=DATA_PATH, SIGNAL_PATH=SIGNAL_PATH)
+    vali_stat = get_hft_summary(vali_result, thre_mat)
     # 并行计算测试集每日的回测结果, 整合到test_stat
     test_result = parLapply(CORE_NUM, all_dates_pkl[test_sample], get_signal_pnl, product=product,
                             signal_name=signal_name, thre_mat=thre_mat,
-                            reverse=reverse, tranct=tranct, max_spread=max_spread, tranct_ratio=tranct_ratio,
-                            flag='test', test_month=test_month,
+                            reverse=reverse, tranct=tranct, max_spread=max_spread, tranct_ratio=tranct_ratio,test_month=test_month,
                             HEAD_PATH=HEAD_PATH, DATA_PATH=DATA_PATH, SIGNAL_PATH=SIGNAL_PATH)
     test_stat = get_hft_summary(test_result, thre_mat)
 
-    return OrderedDict([("train.stat", train_stat), ("test.stat", test_stat)])
+    return OrderedDict([("train.stat", train_stat), ("vali.stat", vali_stat), ("test.stat", test_stat)])
 
 # 趋势和反转分开统计
 def evaluate_signal(signal_name, all_dates_pkl, product, CORE_NUM, HEAD_PATH="order book data/", DATA_PATH="order book data/tmp pkl/", SIGNAL_PATH="order book data/ret/",
-                    train_sample=None, test_sample=None, test_month='202204', save_path="signal result/", reverse=0):
+                    train_sample=None, vali_sample=None, test_sample=None, test_month='202204', save_path="signal result/", reverse=0):
     all_train_signal = pd.DataFrame(columns=[signal_name])
     for date_pkl in all_dates_pkl[train_sample]:
         train_signal = load(DATA_PATH+product+"/"+date_pkl)
@@ -181,12 +180,12 @@ def evaluate_signal(signal_name, all_dates_pkl, product, CORE_NUM, HEAD_PATH="or
 
     if reverse>=0:
         print("reverse=1")
-        trend_signal_stat = get_signal_stat(signal_name, thre_mat, product, all_dates_pkl, CORE_NUM, train_sample, test_sample, reverse=1, tranct=tranct,
+        trend_signal_stat = get_signal_stat(signal_name, thre_mat, product, all_dates_pkl, CORE_NUM, train_sample, vali_sample, test_sample, reverse=1, tranct=tranct,
                                             max_spread=max_spread, tranct_ratio=tranct_ratio, test_month=test_month,
                                             HEAD_PATH=HEAD_PATH, DATA_PATH=DATA_PATH, SIGNAL_PATH=SIGNAL_PATH)
     if reverse<=0:
         print("reverse=-1")
-        reverse_signal_stat = get_signal_stat(signal_name, thre_mat, product, all_dates_pkl, CORE_NUM, train_sample, test_sample, reverse=-1, tranct=tranct,
+        reverse_signal_stat = get_signal_stat(signal_name, thre_mat, product, all_dates_pkl, CORE_NUM, train_sample, vali_sample, test_sample, reverse=-1, tranct=tranct,
                                               max_spread=max_spread, tranct_ratio=tranct_ratio, test_month=test_month,
                                               HEAD_PATH=HEAD_PATH, DATA_PATH=DATA_PATH, SIGNAL_PATH=SIGNAL_PATH)
 
@@ -204,19 +203,20 @@ def evaluate_signal(signal_name, all_dates_pkl, product, CORE_NUM, HEAD_PATH="or
 # ----------------------------------------以下是因子回测以及从训练集到测试集的函数-----------------------------------------
 
 def calculate_evaluate_signal(product_list, all_dates_pkl, signal_name, HEAD_PATH="order book data/", DATA_PATH="order book data/tmp pkl/", SIGNAL_PATH="order book data/ret/",
-                              train_sample=None, test_sample=None, test_month='202204', save_path="signal result/", reverse=1):
+                              train_sample=None, vali_sample=None, test_sample=None, test_month='202204', save_path="signal result/", reverse=1):
     """计算因子评价指标, 保存到signal result atr, 先分趋势和反转, 再分训练集和测试集"""
     print("calculating evaluation signal")
     for product in product_list:
         print(product)
         evaluate_signal(signal_name=signal_name, all_dates_pkl=all_dates_pkl, product=product, CORE_NUM=12, HEAD_PATH=HEAD_PATH, DATA_PATH=DATA_PATH, SIGNAL_PATH=SIGNAL_PATH,
-                        train_sample=train_sample, test_sample=test_sample, test_month=test_month, save_path=save_path, reverse=reverse)
+                        train_sample=train_sample, vali_sample=vali_sample, test_sample=test_sample, test_month=test_month, save_path=save_path, reverse=reverse)
 
-def train_and_test(product_list, format_dates, signal_name, train_sample, test_sample, min_pnl, min_num, test_month='202204', HEAD_PATH="order book data/", save_path="signal result/"):
+def train_and_test(product_list, format_dates, signal_name, train_sample,vali_sample, test_sample, min_pnl, min_num, test_month='202204', HEAD_PATH="order book data/", save_path="signal result/"):
     """训练集筛选阈值组合用于测试集, min_pnl和min_num是阈值组合回测效果的筛选阈值, 即avg.pnl要超过多少倍的买卖价差, 以及交易次数要超过多少次"""
     print("filter combinations in the training set and test them in the testing set")
-    test_all_pnl = np.zeros([sum(test_sample), len(product_list)])
     train_all_pnl = np.zeros([sum(train_sample), len(product_list)])
+    vali_all_pnl = np.zeros([sum(vali_sample), len(product_list)])
+    test_all_pnl = np.zeros([sum(test_sample), len(product_list)])
 
     i = 0
     chosen_product_list = []
@@ -230,11 +230,14 @@ def train_and_test(product_list, format_dates, signal_name, train_sample, test_s
             continue
         train_pnl = train_stat["daily.ret"].loc[:, good_strat].sum(axis=1) / sum(good_strat)
         # 好的阈值组合在测试集上测试, 取平均
+        vali_stat = signal_stat["vali.stat"]
+        vali_pnl = vali_stat["daily.ret"].loc[:, good_strat].sum(axis=1) / sum(good_strat)
         test_stat = signal_stat["test.stat"]
         test_pnl = test_stat["daily.ret"].loc[:, good_strat].sum(axis=1) / sum(good_strat)
-        print(product, "train sharpe ", sharpe(train_pnl), "test sharpe ", sharpe(test_pnl))
+        print(product, "train sharpe ", sharpe(train_pnl), "vali sharpe ", sharpe(vali_pnl), "test sharpe ", sharpe(test_pnl))
         # 各品种分开记录
         train_all_pnl[:, i] = train_pnl
+        vali_all_pnl[:, i] = vali_pnl
         test_all_pnl[:, i] = test_pnl
         chosen_product_list.append(i)
         i = i + 1
@@ -243,21 +246,24 @@ def train_and_test(product_list, format_dates, signal_name, train_sample, test_s
         best_weight = get_Markowitz_weight(train_pnl=train_all_pnl, chosen_product_list=chosen_product_list)
         best_weight = np.array(best_weight)
         train_portfolio = np.array(np.dot(train_all_pnl, best_weight))
+        vali_portfolio = np.array(np.dot(vali_all_pnl, best_weight))
         test_portfolio = np.array(np.dot(test_all_pnl, best_weight))
     else:
         train_portfolio = train_all_pnl[:, 0]
+        vali_portfolio = vali_all_pnl[:, 0]
         test_portfolio = test_all_pnl[:, 0]
 
     # train_portfolio = np.array(np.mean(train_all_pnl, axis=1))  # 各品种取均值, 可以根据马科维兹配置权重
     # test_portfolio = np.array(np.mean(test_all_pnl, axis=1))
-    all_portfolio = np.append(train_portfolio, test_portfolio)
+    all_portfolio = np.append(train_portfolio, vali_portfolio, test_portfolio)
 
     plt.figure(1, figsize=(16, 10))
     plt.title("")
     plt.xlabel("date")
     plt.ylabel("pnl")
     plt.title("portfolio")
-    plt.plot(format_dates[train_sample | test_sample], all_portfolio.cumsum())
-    plt.plot(format_dates[test_sample], all_portfolio.cumsum()[len(train_portfolio):])
+    plt.plot(format_dates[train_sample | vali_sample | test_sample], all_portfolio.cumsum())
+    plt.plot(format_dates[vali_sample | test_sample], all_portfolio.cumsum()[len(train_portfolio):])
+    plt.plot(format_dates[test_sample], all_portfolio.cumsum()[(len(train_portfolio)+len(vali_portfolio)):])
     plt.show()
-    print("train sharpe: ", sharpe(train_portfolio), "test sharpe: ", sharpe(test_portfolio))
+    print("train sharpe: ", sharpe(train_portfolio), "vali sharpe: ", sharpe(vali_portfolio), "test sharpe: ", sharpe(test_portfolio))
