@@ -79,7 +79,9 @@ Once starting training the model, a log file will be saved under the `./logs` di
 `utils/product_info.py`: Price difference between buying and selling, handling fees and rates for each product
 
 `utils/tasks.py`: Reshape model outputs for each task
-
+# model lightweight
+InfoBatch-ICLR2024
+https://github.com/henryqin1997/InfoBatch
 
 
 
